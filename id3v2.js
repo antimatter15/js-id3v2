@@ -36,6 +36,7 @@ ID3v2 = {
 		"14": "Publisher/Studio logotype",
 	}
 
+	//from: http://bitbucket.org/moumar/ruby-mp3info/src/tip/lib/mp3info/id3v2.rb
 	var TAGS = {
     "AENC": "Audio encryption",
     "APIC": "Attached picture",
@@ -111,8 +112,69 @@ ID3v2 = {
     "WPAY": "Payment",
     "WPUB": "Publishers official webpage",
     "WXXX": "User defined URL link frame"
-  }
-		
+  };
+  
+	var TAG_MAPPING_2_2_to_2_3 = {
+    "BUF": "RBUF",
+    "COM": "COMM",
+    "CRA": "AENC",
+    "EQU": "EQUA",
+    "ETC": "ETCO",
+    "GEO": "GEOB",
+    "MCI": "MCDI",
+    "MLL": "MLLT",
+    "PIC": "APIC",
+    "POP": "POPM",
+    "REV": "RVRB",
+    "RVA": "RVAD",
+    "SLT": "SYLT",
+    "STC": "SYTC",
+    "TAL": "TALB",
+    "TBP": "TBPM",
+    "TCM": "TCOM",
+    "TCO": "TCON",
+    "TCR": "TCOP",
+    "TDA": "TDAT",
+    "TDY": "TDLY",
+    "TEN": "TENC",
+    "TFT": "TFLT",
+    "TIM": "TIME",
+    "TKE": "TKEY",
+    "TLA": "TLAN",
+    "TLE": "TLEN",
+    "TMT": "TMED",
+    "TOA": "TOPE",
+    "TOF": "TOFN",
+    "TOL": "TOLY",
+    "TOR": "TORY",
+    "TOT": "TOAL",
+    "TP1": "TPE1",
+    "TP2": "TPE2",
+    "TP3": "TPE3",
+    "TP4": "TPE4",
+    "TPA": "TPOS",
+    "TPB": "TPUB",
+    "TRC": "TSRC",
+    "TRD": "TRDA",
+    "TRK": "TRCK",
+    "TSI": "TSIZ",
+    "TSS": "TSSE",
+    "TT1": "TIT1",
+    "TT2": "TIT2",
+    "TT3": "TIT3",
+    "TXT": "TEXT",
+    "TXX": "TXXX",
+    "TYE": "TYER",
+    "UFI": "UFID",
+    "ULT": "USLT",
+    "WAF": "WOAF",
+    "WAR": "WOAR",
+    "WAS": "WOAS",
+    "WCM": "WCOM",
+    "WCP": "WCOP",
+    "WPB": "WPB",
+    "WXX": "WXXX"
+  };
 	function encode_64(input) {
 		var output = "", i = 0, l = input.length,
 		key = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=", 
@@ -203,6 +265,11 @@ ID3v2 = {
 				onComplete(tag);
 				return;
 			}
+			console.log(frame_id)
+			if(!TAGS[frame_id] && TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)]){
+				frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
+			}
+			console.log(frame_id)
 			read(4, function(s, size){
 				var intsize = arr2int(size);
 				read(2, function(s, flags){
@@ -225,6 +292,7 @@ ID3v2 = {
 		if(header == "ID3"){
 			read(2, function(s, version){
 				tag.version = "ID3v2."+version[0]+'.'+version[1];
+				console.log('version',tag.version);
 				read(1, function(s, flags){
 					//todo: parse flags
 					flags = pad(flags[0]);
