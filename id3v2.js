@@ -220,14 +220,19 @@ ID3v2 = {
 
 	//taken from http://github.com/ppiotrowicz/ID3v2-/blob/master/ID3v2Sharp/Header.cs
 	function arr2int(data){
-		var size = data[0] << 0x15;
-		size += data[1] << 14;
-		size += data[2] << 7;
-		size += data[3];
+		if(data.length == 4){
+			var size = data[0] << 0x15;
+			size += data[1] << 14;
+			size += data[2] << 7;
+			size += data[3];
+		}else{
+			var size = data[0] << 14;
+			size += data[1] << 7;
+			size += data[2];
+		}
 		return size;
 	}
-
-
+	
 	function parseImage(str){
 		var TextEncoding = str.charCodeAt(0);
 		str = str.substr(1);
@@ -260,34 +265,61 @@ ID3v2 = {
 	};
 
 	function read_frame(){
-		read(4, function(frame_id){
+		read(3, function(frame_id){
 			if(frame_id == '\0\0\0\0'){
 				onComplete(tag);
 				return;
 			}
 			console.log(frame_id)
-			if(!TAGS[frame_id] && TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)]){
+			if(TAG_MAPPING_2_2_to_2_3[frame_id]){
 				frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
+				read_frame2(frame_id);
+			}else{
+				read(1, function(frame_id_end){
+					read_frame3(frame_id + frame_id_end);
+				})
 			}
-			console.log(frame_id)
-			read(4, function(s, size){
-				var intsize = arr2int(size);
-				read(2, function(s, flags){
-					flags = pad(flags[0]).concat(pad(flags[1]));
+		})
+	}
+	
+	
+	function read_frame3(frame_id){
+		read(4, function(s, size){
+			var intsize = arr2int(size);
+			console.log(size, intsize);
+			read(2, function(s, flags){
+				flags = pad(flags[0]).concat(pad(flags[1]));
 				
-					read(intsize, function(s, a){
-						if(typeof TAG_HANDLERS[frame_id] == 'function'){
-							TAG_HANDLERS[frame_id](intsize, s, a);
-						}else{
-							tag[TAGS[frame_id]] = s;
-						}
-						read_frame();
-					})
+				read(intsize, function(s, a){
+					if(typeof TAG_HANDLERS[frame_id] == 'function'){
+						TAG_HANDLERS[frame_id](intsize, s, a);
+					}else{
+						tag[TAGS[frame_id]] = s;
+					}
+					console.log(tag)
+					read_frame();
 				})
 			})
 		})
 	}
-
+	
+	function read_frame2(frame_id){
+		read(3, function(s, size){
+			var intsize = arr2int(size);
+			console.log(size, intsize);
+			read(intsize, function(s, a){
+				if(typeof TAG_HANDLERS[frame_id] == 'function'){
+					TAG_HANDLERS[frame_id](intsize, s, a);
+				}else{
+					tag[TAGS[frame_id]] = s;
+				}
+									console.log(tag)
+				read_frame();
+			})
+		})
+	}
+	
+	
 	read(3, function(header){
 		if(header == "ID3"){
 			read(2, function(s, version){
