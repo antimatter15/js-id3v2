@@ -85,7 +85,7 @@ ID3v2 = {
     "TOPE": "Original artist",
     "TORY": "Original release year",
     "TOWN": "File owner",
-    "TPE1": "Lead performer",
+    "TPE1": "Artist",
     "TPE2": "Band",
     "TPE3": "Conductor",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
@@ -178,7 +178,7 @@ ID3v2 = {
   
   //pulled from http://www.id3.org/id3v2-00 and changed with a simple replace
   //probably should be an array instead, but thats harder to convert -_-
-  var ID3_3_GENRES = {
+  var ID3_2_GENRES = {
 		"0": "Blues",
 		"1": "Classic Rock",
 		"2": "Country",
@@ -393,6 +393,14 @@ ID3v2 = {
 		},
 		"TLEN": function(size, s, a){
 			tag.Length = parseDuration(s);
+		},
+		"TCO": function(size, s, a){
+			if(/\(.+\)/.test(s)){
+				var genre = ID3_2_GENRES[parseInt(s.replace(/[\0\(\)]/g,''))]
+			}else{
+				var genre = s;
+			}
+			tag.Genre = genre;
 		}
 	};
 
@@ -404,8 +412,8 @@ ID3v2 = {
 			}
 			console.log(frame_id)
 			if(TAG_MAPPING_2_2_to_2_3[frame_id]){
-				frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
-				read_frame2(frame_id);
+				var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
+				read_frame2(frame_id, new_frame_id);
 			}else{
 				read(1, function(frame_id_end){
 					read_frame3(frame_id + frame_id_end);
@@ -426,7 +434,7 @@ ID3v2 = {
 					if(typeof TAG_HANDLERS[frame_id] == 'function'){
 						TAG_HANDLERS[frame_id](intsize, s, a);
 					}else{
-						tag[TAGS[frame_id]] = s;
+						tag[TAGS[frame_id]] = s.replace(/\0/g,'');
 					}
 					console.log(tag)
 					read_frame();
@@ -435,15 +443,17 @@ ID3v2 = {
 		})
 	}
 	
-	function read_frame2(frame_id){
+	function read_frame2(v2ID, frame_id){
 		read(3, function(s, size){
 			var intsize = arr2int(size);
 			console.log(size, intsize);
 			read(intsize, function(s, a){
-				if(typeof TAG_HANDLERS[frame_id] == 'function'){
+				if(typeof TAG_HANDLERS[v2ID] == 'function'){
+					TAG_HANDLERS[v2ID](intsize, s, a);
+				}else if(typeof TAG_HANDLERS[frame_id] == 'function'){
 					TAG_HANDLERS[frame_id](intsize, s, a);
 				}else{
-					tag[TAGS[frame_id]] = s;
+					tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
 				}
 									console.log(tag)
 				read_frame();
