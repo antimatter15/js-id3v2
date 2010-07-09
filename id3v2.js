@@ -431,27 +431,34 @@ ID3v2 = {
 	};
 
 	function read_frame(){
-		read(3, function(frame_id){
-			console.log(frame_id)
-			if(TAG_MAPPING_2_2_to_2_3[frame_id]){
-				var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
-				read_frame2(frame_id, new_frame_id);
-			}else if(/^[A-Z0-9]{3}$/.test(frame_id)){
-				read(1, function(frame_id_end){
-					read_frame3(frame_id + frame_id_end);
-				})
-			}else{
-				onComplete(tag);
-				return;
-			}
-		})
+		if(tag.revision < 3){
+			read(3, function(frame_id){
+				//console.log(frame_id)
+				if(TAG_MAPPING_2_2_to_2_3[frame_id]){
+					var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
+					read_frame2(frame_id, new_frame_id);
+				}else{
+					onComplete(tag);
+					return;
+				}
+			})
+		}else{
+			read(4, function(frame_id){
+				//console.log(frame_id)
+				if(TAGS[frame_id]){
+					read_frame3(frame_id);
+				}else{
+					onComplete(tag);
+					return;
+				}
+			})
+		}
 	}
 	
 	
 	function read_frame3(frame_id){
 		read(4, function(s, size){
 			var intsize = arr2int(size);
-			console.log(size, intsize);
 			read(2, function(s, flags){
 				flags = pad(flags[0]).concat(pad(flags[1]));
 				
@@ -461,7 +468,7 @@ ID3v2 = {
 					}else{
 						tag[TAGS[frame_id]] = s.replace(/\0/g,'');
 					}
-					console.log(tag)
+					//console.log(tag)
 					read_frame();
 				})
 			})
@@ -471,7 +478,7 @@ ID3v2 = {
 	function read_frame2(v2ID, frame_id){
 		read(3, function(s, size){
 			var intsize = arr2int(size);
-			console.log(size, intsize);
+			//console.log(size, intsize);
 			read(intsize, function(s, a){
 				if(typeof TAG_HANDLERS[v2ID] == 'function'){
 					TAG_HANDLERS[v2ID](intsize, s, a);
@@ -480,7 +487,7 @@ ID3v2 = {
 				}else{
 					tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
 				}
-									console.log(tag)
+									//console.log(tag)
 				read_frame();
 			})
 		})
@@ -491,7 +498,8 @@ ID3v2 = {
 		if(header == "ID3"){
 			read(2, function(s, version){
 				tag.version = "ID3v2."+version[0]+'.'+version[1];
-				console.log('version',tag.version);
+				tag.revision = version[0];
+				//console.log('version',tag.version);
 				read(1, function(s, flags){
 					//todo: parse flags
 					flags = pad(flags[0]);
@@ -507,6 +515,7 @@ ID3v2 = {
 			return false; //no header found
 		}
 	})
+	return tag;
 },
 
 parseURL: function(url, onComplete){
@@ -544,7 +553,7 @@ parseURL: function(url, onComplete){
 		setTimeout(arguments.callee, 0);
 	})()
 	xhr.send(null);
-	ID3v2.parseStream(read, onComplete);
+	return [xhr, ID3v2.parseStream(read, onComplete)];
 }
 }
 

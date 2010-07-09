@@ -1,18 +1,18 @@
 <script src="id3v2.js"></script>
-<img id="pic" style="float:left">
+<img id="pic" style="float:left" width="256">
 <h1 id="title"></h1>
 <h3 id="album"></h3>
 Track No. <span id="trackno"></span><br>
 Genre: <span id="genre"></span><br>
 Lead performer: <span id="lead"></span><br>
 Duration: <span id="duration"></span><br>
-
+<div id="lyrics"></div>
 <script>
 function $(id){return document.getElementById(id)}
-ID3v2.parseURL('../mp3.mp3',function(tags){
+ID3v2.parseURL('../mp3d.mp3',function(tags){
 	console.log(tags);
 	$('pic').src = tags.pictures.length && tags.pictures[0].dataURL;
-	$('title').innerHTML = tags.Title || tags.Album
+	$('title').innerHTML = tags.Title;
 	$('album').innerHTML = tags.Album
 	$('trackno').innerHTML = tags['Track number']
 	$('lead').innerHTML = tags['Artist']
