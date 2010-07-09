@@ -2,7 +2,7 @@
 <script src="id3v2.js"></script>
 <script>
 var xhr = new XMLHttpRequest();
-xhr.open('get', 'mp3.mp3', true);
+xhr.open('get', '../mp3.mp3', true);
 xhr.overrideMimeType('text/plain; charset=x-user-defined'); 
 var pos = 0, bits_required = 0, handle = function(){}, max_size = Infinity;
 
@@ -56,24 +56,26 @@ function arr2int(data){
 }
 
 
-function imageToDataURL(str){
-
+function parseImage(str){
 	var TextEncoding = str.charCodeAt(0);
 	str = str.substr(1);
 	var MimeTypePos = str.indexOf('\0');
 	var MimeType = str.substr(0, MimeTypePos);
-	str = str.substr(MimeTypePos);
+	str = str.substr(MimeTypePos+1);
 	var PictureType = str.charCodeAt(0);
 	var TextPictureType = PICTURE_TYPES[PictureType.toString(16).toUpperCase()];
 	str = str.substr(1);
 	var DescriptionPos = str.indexOf('\0');
 	var Description = str.substr(0, DescriptionPos);
-	str = str.substr(DescriptionPos);
+	str = str.substr(DescriptionPos+1);
 	var PictureData = str;
-	
-	console.log(TextEncoding, MimeType, TextPictureType, Description, PictureData);
-	
-	return 'data:'+MimeType+';base64,'+btoa(PictureData);
+	var Magic = PictureData.split('').map(function(e){return String.fromCharCode(e.charCodeAt(0) & 0xff)}).join('');
+	return {
+		dataURL: 'data:'+MimeType+';base64,'+encode_64(Magic),
+		PictureType: TextPictureType,
+		Description: Description,
+		MimeType: MimeType
+	};
 }
 
 function read_frame(){
