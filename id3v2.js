@@ -1,16 +1,5 @@
 ID3v2 = {
 	parseStream: function(stream, onComplete){
-	var tag = {
-		pictures: []
-	};
-	
-	
-	var max_size = Infinity;
-	
-	function read(bytes, callback){
-		stream(bytes, callback, max_size);
-	}
-	
 
 	var PICTURE_TYPES = {
 		"0": "Other",
@@ -306,7 +295,19 @@ ID3v2 = {
 		"124": "Euro-House",
 		"125": "Dance Hall"
 		};
-  
+		
+	var tag = {
+		pictures: []
+	};
+	
+	
+	var max_size = Infinity;
+	
+	function read(bytes, callback){
+		stream(bytes, callback, max_size);
+	}
+	
+	
 	function encode_64(input) {
 		var output = "", i = 0, l = input.length,
 		key = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=", 
@@ -350,7 +351,6 @@ ID3v2 = {
 		return (new Array(8-arr.length+1)).join('0') + arr;
 	}
 
-	//taken from http://github.com/ppiotrowicz/ID3v2-/blob/master/ID3v2Sharp/Header.cs
 	function arr2int(data){
 		if(data.length == 4){
 			var size = data[0] << 0x15;
@@ -358,8 +358,8 @@ ID3v2 = {
 			size += data[2] << 7;
 			size += data[3];
 		}else{
-			var size = data[0] << 14;
-			size += data[1] << 7;
+			var size = data[0] << 16;
+			size += data[1] << 8;
 			size += data[2];
 		}
 		return size;
@@ -386,10 +386,36 @@ ID3v2 = {
 			MimeType: MimeType
 		};
 	}
+	
+	function parseImage2(str){
+		var TextEncoding = str.charCodeAt(0);
+		str = str.substr(1);
+		var Type = str.substr(0, 3);
+		str = str.substr(3);
+		
+		var PictureType = str.charCodeAt(0);
+		var TextPictureType = PICTURE_TYPES[PictureType.toString(16).toUpperCase()];
+		
+		str = str.substr(1);
+		var DescriptionPos = str.indexOf('\0');
+		var Description = str.substr(0, DescriptionPos);
+		str = str.substr(DescriptionPos+1);
+		var PictureData = str;
+		var Magic = PictureData.split('').map(function(e){return String.fromCharCode(e.charCodeAt(0) & 0xff)}).join('');
+		return {
+			dataURL: 'data:img/'+Type+';base64,'+encode_64(Magic),
+			PictureType: TextPictureType,
+			Description: Description,
+			MimeType: MimeType
+		};
+	}
 
 	var TAG_HANDLERS = {
 		"APIC": function(size, s, a){
 			tag.pictures.push(parseImage(s));
+		},
+		"PIC": function(size, s, a){
+			tag.pictures.push(parseImage2(s));
 		},
 		"TLEN": function(size, s, a){
 			tag.Length = parseDuration(s);
@@ -406,18 +432,17 @@ ID3v2 = {
 
 	function read_frame(){
 		read(3, function(frame_id){
-			if(frame_id == '\0\0\0\0'){
-				onComplete(tag);
-				return;
-			}
 			console.log(frame_id)
 			if(TAG_MAPPING_2_2_to_2_3[frame_id]){
 				var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
 				read_frame2(frame_id, new_frame_id);
-			}else{
+			}else if(/^[A-Z0-9]{3}$/.test(frame_id)){
 				read(1, function(frame_id_end){
 					read_frame3(frame_id + frame_id_end);
 				})
+			}else{
+				onComplete(tag);
+				return;
 			}
 		})
 	}

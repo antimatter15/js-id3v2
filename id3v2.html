@@ -12,11 +12,11 @@ function $(id){return document.getElementById(id)}
 ID3v2.parseURL('../mp3.mp3',function(tags){
 	console.log(tags);
 	$('pic').src = tags.pictures.length && tags.pictures[0].dataURL;
-	$('title').innerHTML = tags.Title
+	$('title').innerHTML = tags.Title || tags.Album
 	$('album').innerHTML = tags.Album
 	$('trackno').innerHTML = tags['Track number']
 	$('lead').innerHTML = tags['Artist']
 	$('genre').innerHTML = tags.Genre
-	$('duration').innerHTML = [tags.Length.minutes,tags.Length.seconds].join(':')
+	$('duration').innerHTML = tags.Length?[tags.Length.minutes,tags.Length.seconds].join(':'):'Unknown'
 })
 </script>
