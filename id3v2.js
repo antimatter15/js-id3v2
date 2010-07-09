@@ -26,6 +26,7 @@ ID3v2 = {
 	}
 
 	//from: http://bitbucket.org/moumar/ruby-mp3info/src/tip/lib/mp3info/id3v2.rb
+	//TODO: replace with something longer
 	var TAGS = {
     "AENC": "Audio encryption",
     "APIC": "Attached picture",
@@ -420,13 +421,13 @@ ID3v2 = {
 		"TLEN": function(size, s, a){
 			tag.Length = parseDuration(s);
 		},
-		"TCO": function(size, s, a){
-			if(/\(.+\)/.test(s)){
+		"TCON": function(size, s, a){
+			if(/\([0-9]+\)/.test(s)){
 				var genre = ID3_2_GENRES[parseInt(s.replace(/[\0\(\)]/g,''))]
 			}else{
 				var genre = s;
 			}
-			tag.Genre = genre;
+			tag.Genre = genre.replace(/\0/g,'');
 		}
 	};
 
@@ -434,7 +435,7 @@ ID3v2 = {
 		if(tag.revision < 3){
 			read(3, function(frame_id){
 				//console.log(frame_id)
-				if(TAG_MAPPING_2_2_to_2_3[frame_id]){
+				if(/[A-Z0-9]{3}/.test(frame_id)){
 					var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
 					read_frame2(frame_id, new_frame_id);
 				}else{
@@ -445,7 +446,7 @@ ID3v2 = {
 		}else{
 			read(4, function(frame_id){
 				//console.log(frame_id)
-				if(TAGS[frame_id]){
+				if(/[A-Z0-9]{4}/.test(frame_id)){
 					read_frame3(frame_id);
 				}else{
 					onComplete(tag);
@@ -465,10 +466,11 @@ ID3v2 = {
 				read(intsize, function(s, a){
 					if(typeof TAG_HANDLERS[frame_id] == 'function'){
 						TAG_HANDLERS[frame_id](intsize, s, a);
+					}else if(TAGS[frame_id]){
+						tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
 					}else{
-						tag[TAGS[frame_id]] = s.replace(/\0/g,'');
+						tag[frame_id] = s.replace(/\0/g,'');
 					}
-					//console.log(tag)
 					read_frame();
 				})
 			})
@@ -484,9 +486,11 @@ ID3v2 = {
 					TAG_HANDLERS[v2ID](intsize, s, a);
 				}else if(typeof TAG_HANDLERS[frame_id] == 'function'){
 					TAG_HANDLERS[frame_id](intsize, s, a);
-				}else{
+				}else if(TAGS[frame_id]){
 					tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
-				}
+				}else{
+						tag[frame_id] = s.replace(/\0/g,'');
+					}
 									//console.log(tag)
 				read_frame();
 			})
@@ -554,6 +558,43 @@ parseURL: function(url, onComplete){
 	})()
 	xhr.send(null);
 	return [xhr, ID3v2.parseStream(read, onComplete)];
+},
+parseFile: function(file, onComplete){
+
+	var reader = new FileReader();
+	console.log(reader);
+	
+	var pos = 0, 
+			bits_required = 0, 
+			handle = function(){},
+			maxdata = Infinity;
+
+	function read(bytes, callback, newmax){
+		bits_required = bytes;
+		handle = callback;
+		maxdata = newmax;
+	}
+	var responseText = '';
+	(function(){
+		if(reader.result){
+			responseText = reader.result;
+		}
+		if(reader.result.length > maxdata) reader.abort();
+
+		if(responseText.length > pos + bits_required && bits_required){
+			var data = responseText.substr(pos, bits_required);
+			var arrdata = data.split('').map(function(e){return e.charCodeAt(0) & 0xff});
+			pos += bits_required;
+			bits_required = 0;
+			if(handle(data, arrdata) === false){
+				reader.abort();
+				return;
+			}
+		}
+		setTimeout(arguments.callee, 0);
+	})()
+	reader.readAsBinaryString(file);
+	return [reader, ID3v2.parseStream(read, onComplete)];
 }
 }
 

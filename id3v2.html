@@ -1,4 +1,7 @@
 <script src="id3v2.js"></script>
+<input type="file" id="input" multiple="true" onchange="handleFiles(this.files)" />
+<div>
+<div id="lyrics" style="float:right"></div>
 <img id="pic" style="float:left" width="256">
 <h1 id="title"></h1>
 <h3 id="album"></h3>
@@ -6,17 +9,30 @@ Track No. <span id="trackno"></span><br>
 Genre: <span id="genre"></span><br>
 Lead performer: <span id="lead"></span><br>
 Duration: <span id="duration"></span><br>
-<div id="lyrics"></div>
+</div>
 <script>
+function handleFiles(files){
+	var i = 0;
+	(function(){
+		ID3v2.parseFile(files[i],render_song)
+		if(++i < files.length) setTimeout(arguments.callee, 5000);
+	})();
+}
+
+
 function $(id){return document.getElementById(id)}
-ID3v2.parseURL('../mp3d.mp3',function(tags){
+ID3v2.parseURL('mp3.mp3',render_song)
+
+
+function render_song(tags){
 	console.log(tags);
-	$('pic').src = tags.pictures.length && tags.pictures[0].dataURL;
+	$('pic').src = tags.pictures.length?tags.pictures[0].dataURL:'sad.jpg';
 	$('title').innerHTML = tags.Title;
 	$('album').innerHTML = tags.Album
 	$('trackno').innerHTML = tags['Track number']
 	$('lead').innerHTML = tags['Artist']
 	$('genre').innerHTML = tags.Genre
 	$('duration').innerHTML = tags.Length?[tags.Length.minutes,tags.Length.seconds].join(':'):'Unknown'
-})
+	$('lyrics').innerText = tags['Unsychronized lyric/text transcription']?tags['Unsychronized lyric/text transcription'].substr(3):'N/A';
+}
 </script>
