@@ -1,0 +1,122 @@
+<script src="b64.js"></script>
+<script src="id3v2.js"></script>
+<script>
+var xhr = new XMLHttpRequest();
+xhr.open('get', 'mp3.mp3', true);
+xhr.overrideMimeType('text/plain; charset=x-user-defined'); 
+var pos = 0, bits_required = 0, handle = function(){}, max_size = Infinity;
+
+function read(bytes, callback){
+	bits_required = bytes;
+	handle = callback;
+}
+var responseText = '';
+(function(){
+	if(xhr.responseText){
+		responseText = xhr.responseText;
+	}
+	if(xhr.responseText.length > max_size) xhr.abort();
+	
+	if(responseText.length > pos + bits_required && bits_required){
+		var data = responseText.substr(pos, bits_required);
+		var arrdata = data.split('').map(function(e){return e.charCodeAt(0) & 0xff});
+		pos += bits_required;
+		bits_required = 0;
+		if(handle(data, arrdata) === false){
+			xhr.abort();
+			return;
+		}
+	}
+	
+	setTimeout(arguments.callee, 0);
+})()
+
+xhr.send(null);
+
+var tag = {
+};
+
+/*
+function parseLength(ms){
+	var msec = parseInt(tag.Length.replace(/\0/g,'')) //leading nulls screw up parseInt
+	var minutes = Math.floor(msec/1000/60);
+	var seconds = 60 * ((msec/1000/60)%1)
+	return [minutes, seconds];
+}
+*/
+
+
+//taken from http://github.com/ppiotrowicz/ID3v2-/blob/master/ID3v2Sharp/Header.cs
+function arr2int(data){
+	var size = data[0] << 0x15;
+  size += data[1] << 14;
+  size += data[2] << 7;
+  size += data[3];
+  return size;
+}
+
+
+function imageToDataURL(str){
+
+	var TextEncoding = str.charCodeAt(0);
+	str = str.substr(1);
+	var MimeTypePos = str.indexOf('\0');
+	var MimeType = str.substr(0, MimeTypePos);
+	str = str.substr(MimeTypePos);
+	var PictureType = str.charCodeAt(0);
+	var TextPictureType = PICTURE_TYPES[PictureType.toString(16).toUpperCase()];
+	str = str.substr(1);
+	var DescriptionPos = str.indexOf('\0');
+	var Description = str.substr(0, DescriptionPos);
+	str = str.substr(DescriptionPos);
+	var PictureData = str;
+	
+	console.log(TextEncoding, MimeType, TextPictureType, Description, PictureData);
+	
+	return 'data:'+MimeType+';base64,'+btoa(PictureData);
+}
+
+function read_frame(){
+	read(4, function(frame_id){
+		console.log(frame_id);
+		read(4, function(s, size){
+			var intsize = arr2int(size);
+			console.log('size', intsize);
+			read(2, function(s, flags){
+				read(intsize, function(s, a){
+					if(typeof tag[TAGS[frame_id]] == 'function'){
+						TAGS[frame_id](intsize, s, a);
+					}else{
+						console.log('no handler for ',frame_id,'at',pos);
+						tag[TAGS[frame_id]] = s;
+					}
+					read_frame();
+				})
+			})
+		})
+	})
+}
+
+//s=0;k=0;
+//s+=k;[responseText.substr(s+(k=4+responseText.substr(s).search(/[A-Z]{3}[A-Z0-9]/))-4,4),(s+k-4).toString(16)]
+
+read(3, function(header){
+	if(header == "ID3"){
+		read(2, function(s, version){
+			console.log("Version: ID3v2."+version[0]+'.'+version[1]);
+			read(1, function(s, flags){
+				//todo: parse flags
+				read(4, function(s, size){
+					//size of something
+					console.log('size', arr2int(size));
+					max_size = arr2int(size);
+					read_frame()
+				})
+			})
+		})
+	}else{
+		throw "No ID3v2 Header Found";
+	}
+})
+
+</script>
