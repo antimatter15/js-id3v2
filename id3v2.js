@@ -331,7 +331,7 @@ ID3v2 = {
 
 
 	function parseDuration(ms){
-		var msec = parseInt(ms.replace(/\0/g,'')) //leading nulls screw up parseInt
+		var msec = parseInt(cleanText(ms)) //leading nulls screw up parseInt
 		var secs = Math.floor(msec/1000);
 		var mins = Math.floor(secs/60);
 		var hours = Math.floor(mins/60);
@@ -354,10 +354,17 @@ ID3v2 = {
 
 	function arr2int(data){
 		if(data.length == 4){
-			var size = data[0] << 0x15;
-			size += data[1] << 14;
-			size += data[2] << 7;
-			size += data[3];
+			if(tag.revision > 3){
+				var size = data[0] << 0x15;
+				size += data[1] << 14;
+				size += data[2] << 7;
+				size += data[3];
+			}else{
+				var size = data[0] << 24;
+				size += data[1] << 16;
+				size += data[2] << 8;
+				size += data[3];
+			}
 		}else{
 			var size = data[0] << 16;
 			size += data[1] << 8;
@@ -422,19 +429,20 @@ ID3v2 = {
 			tag.Length = parseDuration(s);
 		},
 		"TCON": function(size, s, a){
+			s = cleanText(s);
 			if(/\([0-9]+\)/.test(s)){
-				var genre = ID3_2_GENRES[parseInt(s.replace(/[\0\(\)]/g,''))]
+				var genre = ID3_2_GENRES[parseInt(s.replace(/[\(\)]/g,''))]
 			}else{
 				var genre = s;
 			}
-			tag.Genre = genre.replace(/\0/g,'');
+			tag.Genre = genre;
 		}
 	};
 
 	function read_frame(){
 		if(tag.revision < 3){
 			read(3, function(frame_id){
-				//console.log(frame_id)
+				console.log(frame_id)
 				if(/[A-Z0-9]{3}/.test(frame_id)){
 					var new_frame_id = TAG_MAPPING_2_2_to_2_3[frame_id.substr(0,3)];
 					read_frame2(frame_id, new_frame_id);
@@ -445,7 +453,7 @@ ID3v2 = {
 			})
 		}else{
 			read(4, function(frame_id){
-				//console.log(frame_id)
+				console.log(frame_id)
 				if(/[A-Z0-9]{4}/.test(frame_id)){
 					read_frame3(frame_id);
 				}else{
@@ -457,19 +465,28 @@ ID3v2 = {
 	}
 	
 	
+	function cleanText(str){
+		if(str.indexOf('http://') != 0){
+			var TextEncoding = str.charCodeAt(0);
+			str = str.substr(1);
+		}
+		//screw it i have no clue
+		return str.replace(/[^A-Za-z0-9\(\)\{\}\[\]\!\@\#\$\%\^\&\* \/\"\'\;\>\<\?\,\~\`\.\n\t]/g,'');
+	}
+	
+	
 	function read_frame3(frame_id){
 		read(4, function(s, size){
 			var intsize = arr2int(size);
 			read(2, function(s, flags){
 				flags = pad(flags[0]).concat(pad(flags[1]));
-				
 				read(intsize, function(s, a){
 					if(typeof TAG_HANDLERS[frame_id] == 'function'){
 						TAG_HANDLERS[frame_id](intsize, s, a);
 					}else if(TAGS[frame_id]){
-						tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
+						tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + cleanText(s)
 					}else{
-						tag[frame_id] = s.replace(/\0/g,'');
+						tag[frame_id] = cleanText(s)
 					}
 					read_frame();
 				})
@@ -480,18 +497,17 @@ ID3v2 = {
 	function read_frame2(v2ID, frame_id){
 		read(3, function(s, size){
 			var intsize = arr2int(size);
-			//console.log(size, intsize);
 			read(intsize, function(s, a){
 				if(typeof TAG_HANDLERS[v2ID] == 'function'){
 					TAG_HANDLERS[v2ID](intsize, s, a);
 				}else if(typeof TAG_HANDLERS[frame_id] == 'function'){
 					TAG_HANDLERS[frame_id](intsize, s, a);
 				}else if(TAGS[frame_id]){
-					tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + s.replace(/\0/g,'');
+					tag[TAGS[frame_id]] = (tag[TAGS[frame_id]]||'') + cleanText(s)
 				}else{
-						tag[frame_id] = s.replace(/\0/g,'');
+						tag[frame_id] = cleanText(s)
 					}
-									//console.log(tag)
+									console.log(tag)
 				read_frame();
 			})
 		})
@@ -503,7 +519,7 @@ ID3v2 = {
 			read(2, function(s, version){
 				tag.version = "ID3v2."+version[0]+'.'+version[1];
 				tag.revision = version[0];
-				//console.log('version',tag.version);
+				console.log('version',tag.version);
 				read(1, function(s, flags){
 					//todo: parse flags
 					flags = pad(flags[0]);
@@ -536,6 +552,7 @@ parseURL: function(url, onComplete){
 		bits_required = bytes;
 		handle = callback;
 		maxdata = newmax;
+		if(bytes == 0) callback('',[]);
 	}
 	var responseText = '';
 	(function(){
@@ -573,6 +590,7 @@ parseFile: function(file, onComplete){
 		bits_required = bytes;
 		handle = callback;
 		maxdata = newmax;
+		if(bytes == 0) callback('',[]);
 	}
 	var responseText = '';
 	(function(){
@@ -580,7 +598,7 @@ parseFile: function(file, onComplete){
 			responseText = reader.result;
 		}
 		if(reader.result.length > maxdata) reader.abort();
-
+	
 		if(responseText.length > pos + bits_required && bits_required){
 			var data = responseText.substr(pos, bits_required);
 			var arrdata = data.split('').map(function(e){return e.charCodeAt(0) & 0xff});
